@@ -32,9 +32,6 @@ const Deals = lazy(() => import('./pages/Deals'));
 const Market = lazy(() => import('./pages/Market'));
 const Traders = lazy(() => import('./pages/Traders'));
 const LocationMap = lazy(() => import('./pages/Location'));
-const Auction = lazy(() => import('./pages/Auction/Auction'));
-const CreateAuction = lazy(() => import('./pages/Auction/CreateAuction'));
-const AuctionDetail = lazy(() => import('./pages/Auction/AuctionDetail'));
 const Login = lazy(() => import('./pages/Auth/Login'));
 const Register = lazy(() => import('./pages/Auth/Register'));
 const FAQ = lazy(() => import('./pages/FAQ'));
@@ -157,7 +154,6 @@ const AppContent = () => {
     message: '',
     severity: 'success'
   });
-  const [auctions, setAuctions] = useState([]);
   const [tradingRates, setTradingRates] = useState({
     buyingRate: 1.02,
     sellingRate: 0.98,
@@ -269,67 +265,6 @@ const AppContent = () => {
     setNotification(prev => ({ ...prev, open: false }));
   };
 
-  const handleCreateAuction = async (auctionData) => {
-    try {
-      const newAuction = {
-        id: Math.random().toString(36).substring(7),
-        ...auctionData,
-        createdAt: new Date().toISOString(),
-        bids: [],
-        status: 'active',
-        seller: {
-          id: auth.user.id,
-          name: auth.user.name,
-          rating: auth.user.rating
-        },
-        views: 0,
-        currentPrice: auctionData.startingPrice
-      };
-      
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setAuctions(prev => [newAuction, ...prev]);
-      showNotification('Auction created successfully!', 'success');
-      return newAuction;
-    } catch (error) {
-      showNotification('Failed to create auction', 'error');
-      throw error;
-    }
-  };
-
-  const handleBid = (auctionId, amount) => {
-    if (!auth.isAuthenticated) {
-      navigate('/login', { state: { from: location } });
-      return;
-    }
-    
-    if (auth.user.balance < amount) {
-      showNotification('Insufficient balance', 'error');
-      return;
-    }
-
-    handlePayment(amount, `Bid on auction ${auctionId}`);
-    
-    // Update auction with new bid
-    setAuctions(prev => prev.map(auction => {
-      if (auction.id === auctionId) {
-        return {
-          ...auction,
-          bids: [
-            ...auction.bids,
-            {
-              bidder: auth.user.name,
-              amount,
-              timestamp: new Date().toISOString()
-            }
-          ],
-          currentPrice: amount
-        };
-      }
-      return auction;
-    }));
-  };
-
   const ProtectedRoute = ({ children }) => {
     if (auth.loading) return (
       <LoadingFallback>
@@ -384,7 +319,6 @@ const AppContent = () => {
           <NavLink to="/" className={location.pathname === '/' ? 'active' : ''}>Home</NavLink>
           <NavLink to="/deals" className={location.pathname === '/deals' ? 'active' : ''}>Deals</NavLink>
           <NavLink to="/market" className={location.pathname === '/market' ? 'active' : ''}>Market</NavLink>
-          <NavLink to="/auction" className={location.pathname === '/auction' ? 'active' : ''}>Auctions</NavLink>
           <NavLink to="/traders" className={location.pathname === '/traders' ? 'active' : ''}>Traders</NavLink>
           <NavLink to="/location" className={location.pathname === '/location' ? 'active' : ''}>Trade Map</NavLink>
           <NavLink to="/leaderboard" className={location.pathname === '/leaderboard' ? 'active' : ''}>
@@ -514,7 +448,7 @@ const AppContent = () => {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/deals" element={<Deals handlePayment={handlePayment} />} />
-            <Route path="/market" element={<Market auctions={auctions} handleBid={handleBid} />} />
+            <Route path="/market" element={<Market />} />
             <Route path="/location" element={<LocationMap />} />
             <Route path="/faq" element={<FAQ />} />
             <Route path="/contact" element={<Contact />} />
@@ -526,28 +460,6 @@ const AppContent = () => {
               </ProtectedRoute>
             } />
             <Route path="/leaderboard" element={<Leaderboard data={leaderboard} />} />
-            
-            {/* Auction Routes */}
-            <Route path="/auction" element={<Auction auctions={auctions} handleBid={handleBid} />} />
-            <Route 
-              path="/auction/create" 
-              element={
-                <ProtectedRoute>
-                  <CreateAuction 
-                    onCreateAuction={handleCreateAuction} 
-                    user={auth.user}
-                  />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/auction/:id" 
-              element={<AuctionDetail 
-                auctions={auctions}
-                handleBid={handleBid}
-                user={auth.user}
-              />} 
-            />
             
             {/* Protected Routes */}
             <Route 
