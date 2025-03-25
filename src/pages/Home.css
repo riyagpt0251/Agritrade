@@ -1,0 +1,105 @@
+.hero-section {
+    padding: 5rem 0;
+    background: linear-gradient(135deg, #2e7d32 0%, #4caf50 100%);
+    color: white;
+  }
+  
+  .hero-text h1 {
+    font-size: 3rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+  }
+  
+  .hero-image {
+    position: relative;
+    min-height: 400px;
+  }
+  
+  .feature-card {
+    transition: transform 0.3s ease;
+    border: none;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  }
+  
+  .feature-card:hover {
+    transform: translateY(-5px);
+  }
+  
+  .feature-icon {
+    color: #2e7d32;
+  }
+  
+  .community-images {
+    position: relative;
+    height: 400px;
+  }
+  
+  .farmer-img {
+    position: absolute;
+    width: 60%;
+    left: 0;
+    top: 0;
+    z-index: 1;
+    border: 5px solid white;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  }
+  
+  .trader-img {
+    position: absolute;
+    width: 60%;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+    border: 5px solid white;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  }
+  
+  .member-badge {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 3;
+    font-size: 1.1rem;
+    padding: 0.5rem 1rem;
+  }
+  
+  .community-list {
+    list-style: none;
+    padding-left: 0;
+  }
+  
+  .community-list li {
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+  }
+  
+  .market-stats {
+    display: flex;
+    gap: 2rem;
+    margin: 2rem 0;
+  }
+  
+  .stat-item h3 {
+    color: #2e7d32;
+    font-weight: 700;
+  }
+  
+  .testimonials-section .carousel {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  
+  .testimonial-item {
+    padding: 2rem;
+  }
+  
+  .testimonial-item p {
+    font-size: 1.2rem;
+    font-style: italic;
+  }
+  
+  .cta-section {
+    background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 100%);
+    padding: 4rem 0;
+  }
