@@ -1,11 +1,12 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+/* eslint-disable no-unused-vars */
+import React, { useState, useEffect, lazy, Suspense, useRef } from 'react';
 import { 
   BrowserRouter as Router, 
   Routes, 
   Route, 
   Navigate, 
   Link, 
-  useLocation,
+  useLocation, 
   useNavigate 
 } from 'react-router-dom';
 import styled from 'styled-components';
@@ -16,29 +17,19 @@ import {
   Button, 
   CircularProgress, 
   Snackbar, 
-  Alert,
-  Badge,
-  Popover
+  Alert 
 } from '@mui/material';
 import { Chart } from 'chart.js/auto';
-import { FaCoins, FaChartLine, FaExchangeAlt, FaCrown } from 'react-icons/fa';
+import { FaCoins, FaCrown, FaExchangeAlt } from 'react-icons/fa';
+import io from 'socket.io-client';
 
-// Register Chart.js components
-Chart.register();
-
-// Lazy-loaded components
+// Lazy-loaded pages
 const Home = lazy(() => import('./pages/Home'));
 const Deals = lazy(() => import('./pages/Deals'));
 const Market = lazy(() => import('./pages/Market'));
 const Traders = lazy(() => import('./pages/Traders'));
-const LocationMap = lazy(() => import('./pages/Location'));
 const Login = lazy(() => import('./pages/Auth/Login'));
 const Register = lazy(() => import('./pages/Auth/Register'));
-const FAQ = lazy(() => import('./pages/FAQ'));
-const Contact = lazy(() => import('./pages/Contact'));
-const Privacy = lazy(() => import('./pages/Privacy'));
-const TradingRates = lazy(() => import('./pages/Trading/TradingRates'));
-const ECredit = lazy(() => import('./pages/Finance/ECredit'));
 const Leaderboard = lazy(() => import('./pages/Community/Leaderboard'));
 
 // Styled Components
@@ -60,22 +51,6 @@ const Navbar = styled.nav`
   position: sticky;
   top: 0;
   z-index: 100;
-
-  @media (max-width: 768px) {
-    flex-direction: column;
-    gap: 1rem;
-  }
-`;
-
-const NavLinks = styled.div`
-  display: flex;
-  gap: 1.5rem;
-  align-items: center;
-
-  @media (max-width: 768px) {
-    flex-wrap: wrap;
-    justify-content: center;
-  }
 `;
 
 const NavLink = styled(Link)`
@@ -84,22 +59,14 @@ const NavLink = styled(Link)`
   font-weight: 500;
   padding: 0.5rem;
   border-radius: 4px;
-  transition: all 0.2s;
-
   &:hover {
     background-color: rgba(255,255,255,0.1);
-  }
-
-  &.active {
-    background-color: rgba(255,255,255,0.2);
   }
 `;
 
 const AuthSection = styled.div`
   display: flex;
   gap: 1rem;
-  align-items: center;
-  position: relative;
 `;
 
 const MainContent = styled.main`
@@ -108,449 +75,136 @@ const MainContent = styled.main`
   background-color: #f8f9fa;
 `;
 
-const LoadingFallback = styled.div`
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 200px;
-`;
-
-const PaymentModalContent = styled.div`
-  background-color: white;
-  padding: 2rem;
-  border-radius: 8px;
-  min-width: 400px;
-  outline: none;
-`;
-
-const DropdownMenu = styled.div`
-  position: absolute;
-  right: 0;
-  top: 100%;
-  background-color: white;
-  border-radius: 4px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-  z-index: 1000;
-  min-width: 250px;
-  padding: 1rem;
-  color: #333;
-`;
-
 const AppContent = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const socketRef = useRef(null);
+
+  // State for authentication
   const [auth, setAuth] = useState({
     isAuthenticated: false,
     user: null,
     loading: true
   });
-  const [paymentModal, setPaymentModal] = useState({
-    open: false,
-    amount: 0,
-    item: ''
-  });
-  const [notification, setNotification] = useState({
-    open: false,
-    message: '',
-    severity: 'success'
-  });
-  const [tradingRates, setTradingRates] = useState({
-    buyingRate: 1.02,
-    sellingRate: 0.98,
-    lastUpdated: new Date()
-  });
-  const [showRatesDropdown, setShowRatesDropdown] = useState(false);
-  const [showECreditDropdown, setShowECreditDropdown] = useState(false);
-  const [leaderboard, setLeaderboard] = useState([]);
 
-  // Initialize auth state
+  // Optional: state to hold trader statuses received from the server
+  const [traderStatuses, setTraderStatuses] = useState({});
+
+  // Initialize Socket.IO connection on mount
+  useEffect(() => {
+    // Connect to the Socket.IO server (adjust the URL/port as needed)
+    socketRef.current = io('http://localhost:3001');
+
+    // Listen for trader status updates
+    socketRef.current.on('traderStatus', (status) => {
+      console.log('Received trader status:', status);
+      setTraderStatuses(prev => ({ ...prev, [status.id]: status.online }));
+    });
+
+    // Clean up on unmount
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+      }
+    };
+  }, []);
+
+  // Initialize auth state from localStorage
   useEffect(() => {
     const token = localStorage.getItem('authToken');
     if (token) {
+      // In a real app, also fetch user data here
+      const userData = { id: 'trader123', name: 'Demo User', balance: 5000 };
       setAuth({
         isAuthenticated: true,
-        user: { 
-          id: 'user123',
-          name: 'Demo User', 
-          email: 'demo@example.com',
-          balance: 5000,
-          eCredit: 250,
-          rating: 4.5 
-        },
+        user: userData,
         loading: false
       });
+      // Emit trader login event with trader id
+      socketRef.current && socketRef.current.emit('traderLogin', userData.id);
     } else {
       setAuth(prev => ({ ...prev, loading: false }));
     }
-
-    // Load leaderboard data
-    const mockLeaderboard = [
-      { id: 1, name: 'TraderPro', volume: 125000, rating: 4.9 },
-      { id: 2, name: 'AgriMaster', volume: 98000, rating: 4.8 },
-      { id: 3, name: 'FarmKing', volume: 87500, rating: 4.7 },
-      { id: 4, name: 'CropQueen', volume: 76500, rating: 4.6 },
-      { id: 5, name: 'HarvestHero', volume: 68000, rating: 4.5 }
-    ];
-    setLeaderboard(mockLeaderboard);
-  }, []);
-
-  // Update trading rates periodically
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTradingRates(prev => ({
-        buyingRate: 1.02 + (Math.random() * 0.01 - 0.005),
-        sellingRate: 0.98 + (Math.random() * 0.01 - 0.005),
-        lastUpdated: new Date()
-      }));
-    }, 300000); // Update every 5 minutes
-
-    return () => clearInterval(interval);
   }, []);
 
   const handleLogin = (userData) => {
     localStorage.setItem('authToken', 'dummy-token');
     setAuth({
       isAuthenticated: true,
-      user: { 
-        ...userData, 
-        balance: 5000,
-        eCredit: 250,
-        rating: 4.5
-      },
+      user: userData,
       loading: false
     });
-    showNotification('Login successful!', 'success');
+    // Emit trader login event on login
+    socketRef.current && socketRef.current.emit('traderLogin', userData.id);
+    navigate('/');
   };
 
   const handleLogout = () => {
+    // Emit trader logout event before clearing auth
+    if (auth.user && socketRef.current) {
+      socketRef.current.emit('traderLogout', auth.user.id);
+    }
     localStorage.removeItem('authToken');
     setAuth({
       isAuthenticated: false,
       user: null,
       loading: false
     });
-    showNotification('Logged out successfully', 'info');
-    navigate('/');
+    navigate('/login');
   };
-
-  const handlePayment = (amount, item) => {
-    setPaymentModal({
-      open: true,
-      amount,
-      item
-    });
-  };
-
-  const completePayment = () => {
-    setAuth(prev => ({
-      ...prev,
-      user: {
-        ...prev.user,
-        balance: prev.user.balance - paymentModal.amount
-      }
-    }));
-    setPaymentModal(prev => ({ ...prev, open: false }));
-    showNotification('Payment completed successfully!', 'success');
-  };
-
-  const showNotification = (message, severity = 'success') => {
-    setNotification({
-      open: true,
-      message,
-      severity
-    });
-  };
-
-  const handleCloseNotification = () => {
-    setNotification(prev => ({ ...prev, open: false }));
-  };
-
-  const ProtectedRoute = ({ children }) => {
-    if (auth.loading) return (
-      <LoadingFallback>
-        <CircularProgress style={{ color: '#2e7d32' }} />
-      </LoadingFallback>
-    );
-    if (!auth.isAuthenticated) return <Navigate to="/login" state={{ from: location }} replace />;
-    return children;
-  };
-
-  const PublicRoute = ({ children }) => {
-    if (auth.loading) return (
-      <LoadingFallback>
-        <CircularProgress style={{ color: '#2e7d32' }} />
-      </LoadingFallback>
-    );
-    if (auth.isAuthenticated) return <Navigate to="/" replace />;
-    return children;
-  };
-
-  const toggleRatesDropdown = (e) => {
-    e.stopPropagation();
-    setShowRatesDropdown(!showRatesDropdown);
-    setShowECreditDropdown(false);
-  };
-
-  const toggleECreditDropdown = (e) => {
-    e.stopPropagation();
-    setShowECreditDropdown(!showECreditDropdown);
-    setShowRatesDropdown(false);
-  };
-
-  // Close dropdowns when clicking outside
-  useEffect(() => {
-    const handleClickOutside = () => {
-      setShowRatesDropdown(false);
-      setShowECreditDropdown(false);
-    };
-
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, []);
 
   return (
     <AppContainer>
       <Navbar>
         <Link to="/" style={{ textDecoration: 'none', color: 'white' }}>
-          <h1 style={{ margin: 0 }}>🌱 Agritrade</h1>
+          <h1>🌱 Agritrade</h1>
         </Link>
-
-        <NavLinks>
-          <NavLink to="/" className={location.pathname === '/' ? 'active' : ''}>Home</NavLink>
-          <NavLink to="/deals" className={location.pathname === '/deals' ? 'active' : ''}>Deals</NavLink>
-          <NavLink to="/market" className={location.pathname === '/market' ? 'active' : ''}>Market</NavLink>
-          <NavLink to="/traders" className={location.pathname === '/traders' ? 'active' : ''}>Traders</NavLink>
-          <NavLink to="/location" className={location.pathname === '/location' ? 'active' : ''}>Trade Map</NavLink>
-          <NavLink to="/leaderboard" className={location.pathname === '/leaderboard' ? 'active' : ''}>
-            <FaCrown className="me-1" />
-            Leaderboard
+        <div>
+          <NavLink to="/">Home</NavLink>
+          <NavLink to="/deals">Deals</NavLink>
+          <NavLink to="/market">Market</NavLink>
+          <NavLink to="/traders">Traders</NavLink>
+          <NavLink to="/leaderboard">
+            <FaCrown /> Leaderboard
           </NavLink>
-          
-          {/* Trading Rates Dropdown */}
-          <div className="position-relative">
-            <Button 
-              variant="link" 
-              className="text-white text-decoration-none"
-              onClick={toggleRatesDropdown}
-            >
-              <FaExchangeAlt className="me-1" />
-              Trading Rates
-            </Button>
-            {showRatesDropdown && (
-              <DropdownMenu>
-                <h6 className="mb-2">Current Trading Rates</h6>
-                <div className="d-flex justify-content-between mb-1">
-                  <span>Buying Rate:</span>
-                  <strong>${tradingRates.buyingRate.toFixed(4)}</strong>
-                </div>
-                <div className="d-flex justify-content-between mb-2">
-                  <span>Selling Rate:</span>
-                  <strong>${tradingRates.sellingRate.toFixed(4)}</strong>
-                </div>
-                <small className="text-muted">
-                  Updated: {tradingRates.lastUpdated.toLocaleTimeString()}
-                </small>
-                <div className="mt-2">
-                  <Link to="/trading-rates" className="btn btn-sm btn-outline-primary w-100">
-                    View Details
-                  </Link>
-                </div>
-              </DropdownMenu>
-            )}
-          </div>
-        </NavLinks>
-
+        </div>
         <AuthSection>
-          {/* E-Credit Dropdown */}
-          {auth.isAuthenticated && (
-            <div className="position-relative me-3">
-              <Button 
-                variant="link" 
-                className="text-white text-decoration-none"
-                onClick={toggleECreditDropdown}
-              >
-                <FaCoins className="me-1" />
-                E-Credit: ${auth.user?.eCredit.toLocaleString()}
-              </Button>
-              {showECreditDropdown && (
-                <DropdownMenu style={{ right: 'auto', left: 0 }}>
-                  <h6 className="mb-3">E-Credit Account</h6>
-                  <div className="d-flex justify-content-between mb-2">
-                    <span>Available Balance:</span>
-                    <strong>${auth.user?.eCredit.toLocaleString()}</strong>
-                  </div>
-                  <div className="d-flex justify-content-between mb-3">
-                    <span>Cash Balance:</span>
-                    <strong>${auth.user?.balance.toLocaleString()}</strong>
-                  </div>
-                  <div className="d-grid gap-2">
-                    <Link to="/ecredit" className="btn btn-sm btn-primary">
-                      Manage E-Credit
-                    </Link>
-                    <Button variant="outline-secondary" size="sm">
-                      Transaction History
-                    </Button>
-                  </div>
-                </DropdownMenu>
-              )}
-            </div>
-          )}
-
           {auth.isAuthenticated ? (
             <>
-              <Button 
-                variant="contained" 
-                onClick={handleLogout}
-                style={{ 
-                  backgroundColor: 'white', 
-                  color: '#2e7d32',
-                  textTransform: 'none'
-                }}
-              >
-                Logout
-              </Button>
+              <span>Balance: ${auth.user.balance}</span>
+              <Button variant="contained" onClick={handleLogout}>Logout</Button>
             </>
           ) : (
             <>
-              <Button 
-                component={Link}
-                to="/login"
-                style={{ 
-                  color: 'white',
-                  textTransform: 'none'
-                }}
-              >
-                Login
-              </Button>
-              <Button 
-                component={Link}
-                to="/register"
-                variant="contained"
-                style={{ 
-                  backgroundColor: 'white', 
-                  color: '#2e7d32',
-                  textTransform: 'none'
-                }}
-              >
-                Sign Up
-              </Button>
+              <Button component={Link} to="/login">Login</Button>
+              <Button component={Link} to="/register" variant="contained">Sign Up</Button>
             </>
           )}
         </AuthSection>
       </Navbar>
 
       <MainContent>
-        <Suspense fallback={
-          <LoadingFallback>
-            <CircularProgress style={{ color: '#2e7d32' }} />
-          </LoadingFallback>
-        }>
+        <Suspense fallback={<CircularProgress />}>
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/deals" element={<Deals handlePayment={handlePayment} />} />
+            <Route path="/deals" element={<Deals />} />
             <Route path="/market" element={<Market />} />
-            <Route path="/location" element={<LocationMap />} />
-            <Route path="/faq" element={<FAQ />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/privacy" element={<Privacy />} />
-            <Route path="/trading-rates" element={<TradingRates rates={tradingRates} />} />
-            <Route path="/ecredit" element={
-              <ProtectedRoute>
-                <ECredit user={auth.user} />
-              </ProtectedRoute>
-            } />
-            <Route path="/leaderboard" element={<Leaderboard data={leaderboard} />} />
-            
-            {/* Protected Routes */}
-            <Route 
-              path="/traders" 
-              element={
-                <ProtectedRoute>
-                  <Traders />
-                </ProtectedRoute>
-              } 
-            />
-            
-            {/* Auth Routes */}
-            <Route 
-              path="/login" 
-              element={
-                <PublicRoute>
-                  <Login onLogin={handleLogin} />
-                </PublicRoute>
-              } 
-            />
-            <Route 
-              path="/register" 
-              element={
-                <PublicRoute>
-                  <Register onRegister={handleLogin} />
-                </PublicRoute>
-              } 
-            />
-            
-            {/* Fallback Route */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="/leaderboard" element={<Leaderboard />} />
+            <Route path="/traders" element={auth.isAuthenticated ? <Traders /> : <Navigate to="/login" />} />
+            <Route path="/login" element={!auth.isAuthenticated ? <Login onLogin={handleLogin} /> : <Navigate to="/" />} />
+            <Route path="/register" element={!auth.isAuthenticated ? <Register onLogin={handleLogin} /> : <Navigate to="/" />} />
+            <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </Suspense>
       </MainContent>
-
-      {/* Payment Modal */}
-      <Modal
-        open={paymentModal.open}
-        onClose={() => setPaymentModal(prev => ({ ...prev, open: false }))}
-        closeAfterTransition
-        BackdropComponent={Backdrop}
-        BackdropProps={{ timeout: 500 }}
-      >
-        <Fade in={paymentModal.open}>
-          <PaymentModalContent>
-            <h2>Confirm Payment</h2>
-            <p>You are about to pay ${paymentModal.amount} for {paymentModal.item}</p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
-              <Button 
-                variant="outlined" 
-                onClick={() => setPaymentModal(prev => ({ ...prev, open: false }))}
-              >
-                Cancel
-              </Button>
-              <Button 
-                variant="contained" 
-                color="success" 
-                onClick={completePayment}
-              >
-                Confirm Payment
-              </Button>
-            </div>
-          </PaymentModalContent>
-        </Fade>
-      </Modal>
-
-      {/* Notification Snackbar */}
-      <Snackbar
-        open={notification.open}
-        autoHideDuration={6000}
-        onClose={handleCloseNotification}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        <Alert 
-          onClose={handleCloseNotification} 
-          severity={notification.severity}
-          sx={{ width: '100%' }}
-        >
-          {notification.message}
-        </Alert>
-      </Snackbar>
     </AppContainer>
   );
 };
 
-const App = () => {
-  return (
-    <Router>
-      <AppContent />
-    </Router>
-  );
-};
+const App = () => (
+  <Router>
+    <AppContent />
+  </Router>
+);
 
 export default App;
