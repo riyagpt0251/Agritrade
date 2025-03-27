@@ -1,22 +1,16 @@
 /* eslint-disable no-undef */
 /* eslint-env node */
 const express = require('express');
-const http = require('http');
-const socketIo = require('socket.io');
-const cors = require('cors');
-
 const app = express();
-app.use(cors());
+const port = 3000;
 
-// Update MIME type mapping for .jsx files
-express.static.mime.types['jsx'] = 'application/javascript';
+// Add the following middleware to set the correct MIME type for .jsx files
+express.static.mime.define({'text/jsx': ['jsx']});
 
-const server = http.createServer(app);
-const io = socketIo(server, {
-  cors: {
-    origin: "http://localhost:5173", // Your frontend URL
-    methods: ["GET", "POST"]
-  }
+app.use(express.static('public')); // Serve static files from the 'public' directory
+
+app.listen(port, () => {
+  console.log(`Server listening on port ${port}`);
 });
 
 // Track online traders
